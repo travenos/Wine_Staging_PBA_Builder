@@ -134,7 +134,7 @@ if [[ $CLEAR = 1 ]]
 then
     echo "Removing source codes"
     cd ..
-    rm -rf $WINE_DIR_NAME $STAGING_DIR_NAME $PBA_DIR_NAME
+    rm -rf "$WORKSPACE/$WINE_DIR_NAME" "$WORKSPACE/$STAGING_DIR_NAME" "$WORKSPACE/$PBA_DIR_NAME"
 fi
 
 echo "Patched Wine has been successfully installed to $WINEOUT"
