@@ -11,12 +11,13 @@ THREADS_ARG=-j
 CLEAR_ARG=-c
 HELP_ARG=-h
 
-HELP_STRING="Tool for downloading, patching and building newest Wine with Staging and PBA patches.\n
-Arguments:\n
-$WORK_DIR_ARG - specify working directory\n
-$OUTPUT_DIR_ARG - scecify output directory\n
-$THREADS_ARG - scecify number of threads used for building Wine\n
-$CLEAR_ARG - clear temporary files after successfull installation\n
+HELP_STRING="Tool for downloading, patching and building newest \
+Wine with Staging and PBA patches.\\n
+Arguments:\\n
+$WORK_DIR_ARG - specify working directory\\n
+$OUTPUT_DIR_ARG - scecify output directory\\n
+$THREADS_ARG - scecify number of threads used for building Wine\\n
+$CLEAR_ARG - clear temporary files after successfull installation\\n
 $HELP_ARG - print this help text"
 
 OUTPUT_DIR_NAME=wineoutput
@@ -31,37 +32,47 @@ CLEAR=0
 THREADS_NUMBER=8
 
 # Printing errors
-echoerror() { >&2 echo $@; }
+echoerror() { >&2 echo "$@"; }
 
-SCRIPT=$(readlink -f "$BASH_SOURCE")
+SCRIPT=$(readlink -f "${BASH_SOURCE[0]}")
 WORKSPACE=$(dirname "$SCRIPT")
 
 # Checking arguments
 for (( i=1; i<=$#; i++ ))
 do
-    if [[ ${!i} = $WORK_DIR_ARG ]]
+    if [[ ${!i} == "$WORK_DIR_ARG" ]]
     then
-        i=$(($i+1))
+        ((i++))
         WORKSPACE=$(readlink -f "${!i}")
-    elif [[ ${!i} = $OUTPUT_DIR_ARG ]]
+        if [[ -z "$WORKSPACE" ]]
+        then
+                echoerror "Working directory name not entered after $WORK_DIR_ARG key"
+                exit 1
+        fi
+    elif [[ ${!i} == "$OUTPUT_DIR_ARG" ]]
     then
-        i=$(($i+1))
+        ((i++))
         WINEOUT=$(readlink -f "${!i}")
-    elif [[ ${!i} = $THREADS_ARG ]]
+        if [[ -z "$WINEOUT" ]]
+        then
+                echoerror "Output directory name not entered after ${OUTPUT_DIR_ARG} key"
+                exit 1
+        fi
+    elif [[ ${!i} == "$THREADS_ARG" ]]
     then
-        i=$(($i+1))
+        ((i++))
         THREADS_NUMBER="${!i}"   
         if [[ -z "${THREADS_NUMBER##*[!0-9]*}" || $THREADS_NUMBER = 0 ]]
         then
             echoerror "Invalid number of threads ${!i}"
             exit 1
         fi
-    elif [[ ${!i} = $CLEAR_ARG ]]
+    elif [[ ${!i} == "$CLEAR_ARG" ]]
     then
         CLEAR=1
-    elif [[ ${!i} = $HELP_ARG ]]
+    elif [[ ${!i} == "$HELP_ARG" ]]
     then
-        echo -e $HELP_STRING 
+        echo -e "$HELP_STRING" 
         exit 0
     else
         echoerror "Invalid argument ${!i}"
@@ -75,7 +86,7 @@ then
 fi
 
 mkdir -p "$WORKSPACE" || exit
-cd "$WORKSPACE"
+cd "$WORKSPACE" || exit
 
 # Update sources from git repository
 download_source()
@@ -83,11 +94,9 @@ download_source()
     SOURCE=$1
     DIR=$(basename "$SOURCE")
     DIR=${DIR%.*}
-    cd "$DIR" 2> /dev/null 
-    if [[ $? = 0 ]]
+    if cd "$DIR" 2> /dev/null
     then
-        git clean -fd  2> /dev/null 
-        if [[  $? != 0  ]]
+        if ! git clean -fd  2> /dev/null
         then
             cd ..
             rm -rf "$DIR" || exit
@@ -108,11 +117,11 @@ download_source "$STAGING_SOURCE"
 download_source "$PBA_SOURCE"
 
 #Applying Staging patches
-bash $STAGING_DIR_NAME/patches/patchinstall.sh DESTDIR=$WINE_DIR_NAME --all || exit
-cd $WINE_DIR_NAME
+bash "$STAGING_DIR_NAME/patches/patchinstall.sh" DESTDIR="$WINE_DIR_NAME" --all || exit
+cd "$WINE_DIR_NAME" || exit
 
 #Applying PBA patches
-for f in ../$PBA_DIR_NAME/patches/*
+for f in "../$PBA_DIR_NAME/patches"/*
 do
     patch -p1 < "$f"
 done
@@ -121,11 +130,11 @@ done
 mkdir build32 build64
 
 #Building for x64
-cd build64
-../configure --enable-win64 --with-opengl --with-vulkan  --prefix="$WINEOUT" || exit
+cd build64 || exit
+../configure --enable-win64 --with-opengl --with-vulkan --prefix="$WINEOUT" || exit
 make -j$THREADS_NUMBER && make install -j$THREADS_NUMBER  || exit
 
-cd ../build32
+cd ../build32 || exit
 ../configure --with-wine64=../build64 --with-opengl --with-vulkan --prefix="$WINEOUT" || exit
 make -j$THREADS_NUMBER && make install -j$THREADS_NUMBER  || exit
 
@@ -134,7 +143,8 @@ if [[ $CLEAR = 1 ]]
 then
     echo "Removing source codes"
     cd ..
-    rm -rf "$WORKSPACE/$WINE_DIR_NAME" "$WORKSPACE/$STAGING_DIR_NAME" "$WORKSPACE/$PBA_DIR_NAME"
+    rm -rf "{$WORKSPACE:?}/$WINE_DIR_NAME:?}" "{$WORKSPACE/$STAGING_DIR_NAME:?}" \
+"{$WORKSPACE/$PBA_DIR_NAME:?}" || exit
 fi
 
 echo "Patched Wine has been successfully installed to $WINEOUT"
